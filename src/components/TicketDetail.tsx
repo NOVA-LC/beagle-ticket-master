@@ -5,6 +5,7 @@ import { CodeRunner } from './CodeRunner'
 import { RunHistory } from './RunHistory'
 import { MrrBadge } from './kanban/MrrBadge'
 import { StatusPill } from './StatusPill'
+import { Composer } from './composer/Composer'
 
 interface Props {
   ticket: Y.Map<unknown>
@@ -26,8 +27,9 @@ export function TicketDetail({ ticket, onBack }: Props) {
         </div>
         <h1 className="mt-2 text-lg font-semibold text-zinc-100">{t.title}</h1>
       </header>
-      <div className="px-4 py-4">
+      <div className="flex flex-col gap-6 px-4 py-4">
         <CodeRunner ticket={ticket} />
+        <Composer ticket={ticket} />
       </div>
       <RunHistory ticket={ticket} />
     </div>

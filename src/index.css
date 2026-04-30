@@ -21,3 +21,32 @@
   .token.function, .token.class-name { color: #fbbf24; }
   .token.regex, .token.important, .token.variable { color: #fb923c; }
 }
+
+/* Tiptap empty-state ghost prompt */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: 'Comment, paste a script with /run, or link a property with [[…';
+  color: #475569;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Radix Popover fade in/out for the AIContext bubble. Spec: 120ms in, 80ms out. */
+@keyframes aicontext-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes aicontext-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-2px); }
+}
+.aicontext[data-state='open']  { animation: aicontext-in 120ms ease-out; }
+.aicontext[data-state='closed'] { animation: aicontext-out 80ms ease-in; }
+
+/* Tippy: kill default white background — we paint our own. */
+.tippy-box[data-theme~='light'],
+.tippy-box {
+  background: transparent;
+  color: inherit;
+}
+.tippy-box > .tippy-arrow { display: none; }

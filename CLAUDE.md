@@ -33,8 +33,11 @@ Pyodide runs in `src/workers/python.worker.ts` (Comlink-exposed). Streamed stdou
 ### ✅ Phase 3 — Dollar-weighted Kanban + Cmd-K palette
 `RevenueKanban` at `/`: three main columns (Triage / Scripting / Review) + collapsed Done rail. dnd-kit handles drag-between-columns; drop = `ticket.set('status', newStatus)` + audit event. Cmd-K palette at app root: Jump (fuzzy ticket search), Action on current ticket (sub-pages via Tab for status / assign / tag), Filter board (URL-based), Navigate. Position memory per `route + page`.
 
-### 🔜 Phase 4 — *not yet built*
-Likely candidates suggested by the spec evolution: Comments / threaded discussion, Slack-like notifications, ticket creation UI, real attachment upload, settings page (currently a stub at `/settings`).
+### ✅ Phase 4 — Tiptap composer with bi-link entities
+`<Composer />` is mounted on the ticket detail (between CodeRunner and RunHistory). Tiptap React + StarterKit (no dropcursor/gapcursor). Custom `BiLink` extension uses `@tiptap/suggestion` with `char: '['` + an `allow()` callback that requires the prior char to also be `[` — that's the canonical workaround for Tiptap's single-char trigger limit when you need `[[`. Bi-links render via a React node view that wraps a Radix Popover; hover-OR-click anchored, with manual delays so crossing the trigger→content gap doesn't flicker. `AIContext` reads from `src/lib/entities.ts` (no API yet). Drafts persist to `localStorage` keyed by `draft:ticket:<id>`, debounced 500ms; restore-banner on mount with relative timestamp + dismiss. `SlashMenu` extension scaffolds `/run` (inserts a Python code block) and `/template` (stub). Comments serialize to markdown via a custom Tiptap-JSON walker (`composer/markdown.ts`) and append as `comment` events to the ticket's audit log.
+
+### 🔜 Phase 5 — *not yet built*
+Open candidates: comment list view (currently write-only), inline `/run` code execution (custom node view that hosts a runner per code block), real `entities.ts` populated from Yjs property metadata, ticket creation UI, settings, threaded replies on comments.
 
 ## Hard architectural rules — DO NOT VIOLATE
 
@@ -70,6 +73,12 @@ Events are a discriminated union on `type` with **flat fields** at the top level
 
 ### Y.Map type variance
 Yjs types are invariant in their value parameter. `Y.Map<Y.Map<unknown>>` is **not** assignable to `Y.Map<unknown>`. `tickets` is therefore typed as `Y.Map<unknown>` and consumers cast `tickets.get(id)` to `Y.Map<unknown> | undefined`. This is the simplest workaround — don't try to fix it with generics on the hooks (`useYMap<T>(map: Y.Map<unknown>)` is the contract).
+
+### Tiptap `[[` two-char trigger
+`@tiptap/suggestion`'s `char` config is single-character. `char: '[['` would silently truncate to `[` and fire on every word. The fix in `src/components/composer/BiLink.ts` is `char: '['` + `allow({state, range}) => state.doc.textBetween(range.from - 1, range.from) === '['`. The `command` callback then deletes from `range.from - 1` (one to the left of the captured range) so the leading `[` is gone too. Don't try to "cleanup" by changing the trigger — this is the working approach.
+
+### Tiptap node view for bi-links uses Radix Popover (not HoverCard)
+The spec asked for Radix Popover specifically. Hover behavior is wired manually with `onPointerEnter`/`onPointerLeave` on both Trigger and Content + a small delayed-close timer. `data-state` attribute on `.aicontext` drives the keyframe fade-in/out (120ms in, 80ms out, defined in `index.css`). If the gap between trigger and content gets bigger than 6px, increase `sideOffset` rather than the close delay.
 
 ### Avatar + cn — vendored
 `src/components/ui/avatar.tsx` is a 20-line component, not the Radix-backed shadcn version. `src/lib/utils.ts` is just clsx, not clsx + tailwind-merge. Neither is wired through shadcn's CLI. Add new shadcn components by either running `npx shadcn add <component>` (which will create `components.json` for you) or by vendoring them by hand here.

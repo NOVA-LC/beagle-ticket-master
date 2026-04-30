@@ -2,7 +2,7 @@
 
 Local-first multiplayer ticket queue for Beagle's CS-to-Engineering pipeline. Yjs (CRDT) over y-webrtc + y-indexeddb. No backend. Pyodide-in-worker for executable Python tickets. Dollar-weighted Kanban + Cmd-K command palette.
 
-**Stack:** Vite · React 18 · TypeScript · Tailwind · Yjs · y-webrtc · y-indexeddb · Pyodide (web worker, Comlink) · dnd-kit · cmdk · react-router-dom
+**Stack:** Vite · React 18 · TypeScript · Tailwind · Yjs · y-webrtc · y-indexeddb · Pyodide (web worker, Comlink) · dnd-kit · cmdk · react-router-dom · Tiptap · Tippy.js · Radix Popover
 
 ## Getting started
 
@@ -32,6 +32,14 @@ Keyboard shortcuts inside a ticket:
 - `a` — Assign to
 - `t` — Add property tag
 - `r` — Re-run last script
+
+## Demo: bi-link composer + AI context
+
+1. Open `/ticket/bgl-101`. The Composer sits below the Run pane.
+2. Type `[[wes` — Tippy popover opens with *Westlake Communities*. Press Enter (or click). The bi-link inserts as a styled blue chip.
+3. Hover the chip — the AIContext popover fades in (~120ms) and shows: *"Westlake Communities currently has a 41% verified coverage rate, 17 uninsured units, and **$138K/year in liability exposure**…"*. Click *Show open tickets for this property* — the Kanban filters to that property.
+4. Type a paragraph + a bi-link. **Refresh.** The composer mounts with a *Draft restored — N minutes ago* banner and your full content rehydrated. × dismisses + clears.
+5. Hit ⌘↵ to submit. The comment lands as a `comment` event on the ticket's append-only Y.Array.
 
 ## Architecture notes
 
