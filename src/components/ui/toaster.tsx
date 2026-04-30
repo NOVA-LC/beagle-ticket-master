@@ -1,37 +1,31 @@
-import { useEffect, useState } from 'react'
+import { Toaster as SonnerToaster, toast as sonnerToast } from 'sonner'
 
-interface ToastItem { id: number; msg: string }
-
-let push: ((msg: string) => void) | null = null
-
-export function toast(msg: string) {
-  push?.(msg)
-}
-
+/**
+ * Phase-7 swap: the original homegrown toaster has been replaced by Sonner.
+ * The export surface stays the same so existing callsites (palette,
+ * CodeRunner, etc.) keep working without churn.
+ *
+ * Sonner gives us:
+ *   - swipe-to-dismiss + stacking by default
+ *   - `toast.success / .error / .info` variants
+ *   - `toast(..., { action: { label, onClick } })` for Undo affordances
+ */
 export function Toaster() {
-  const [items, setItems] = useState<ToastItem[]>([])
-
-  useEffect(() => {
-    push = (msg: string) => {
-      const id = Date.now() + Math.random()
-      setItems((prev) => [...prev, { id, msg }])
-      window.setTimeout(() => {
-        setItems((prev) => prev.filter((i) => i.id !== id))
-      }, 3000)
-    }
-    return () => { push = null }
-  }, [])
-
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[200] flex flex-col gap-2">
-      {items.map((i) => (
-        <div
-          key={i.id}
-          className="pointer-events-auto rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-zinc-200 shadow-xl"
-        >
-          {i.msg}
-        </div>
-      ))}
-    </div>
+    <SonnerToaster
+      theme="dark"
+      position="bottom-right"
+      offset={16}
+      toastOptions={{
+        style: {
+          background: 'rgb(15 23 42)',
+          border: '1px solid rgb(30 41 59)',
+          color: 'rgb(228 228 231)',
+          fontSize: '12px',
+        },
+      }}
+    />
   )
 }
+
+export const toast = sonnerToast

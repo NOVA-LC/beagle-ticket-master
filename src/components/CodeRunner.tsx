@@ -6,6 +6,7 @@ import 'prismjs/components/prism-python'
 import { usePyodide } from '@/lib/python/usePyodide'
 import { appendTicketEvent } from '@/lib/yjs/doc'
 import { getCurrentUser } from '@/lib/user'
+import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/utils'
 
 const STARTER_CODE = `import pandas as pd
@@ -50,7 +51,11 @@ export function CodeRunner({ ticket }: Props) {
   const onRun = async () => {
     if (!isReady) return
     const result = await run(code)
-    if (!result || result.timedOut) return
+    if (!result) return
+    if (result.timedOut) {
+      toast.error('Script timed out — terminated after 30s')
+      return
+    }
     appendTicketEvent(ticketId, {
       type: 'script_run',
       by: user.name,
@@ -61,6 +66,7 @@ export function CodeRunner({ ticket }: Props) {
       durationMs: result.durationMs,
       runBy: user.name,
     })
+    toast.success(`Ran ${(result.durationMs / 1000).toFixed(1)}s · output below`)
   }
 
   // Stable ref so the global event listener always invokes the freshest version.
@@ -86,6 +92,24 @@ export function CodeRunner({ ticket }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+        <span
+          aria-hidden
+          className={cn(
+            'h-2 w-2 rounded-full transition-colors duration-150',
+            isReady && 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]',
+            isRunning && 'bg-amber-400 animate-pulse',
+            status === 'loading' && 'bg-slate-700',
+            status === 'error' && 'bg-red-500',
+          )}
+        />
+        <span>
+          {status === 'loading' && 'Booting Python…'}
+          {isReady && 'Python ready'}
+          {isRunning && 'Running…'}
+          {status === 'error' && 'Error — recovering'}
+        </span>
+      </div>
       {(status === 'loading' || (status === 'error' && loadProgress < 1)) && (
         <div className="flex flex-col gap-1.5 rounded-md border border-slate-800 bg-slate-900/40 px-3 py-2">
           <div className="flex items-center justify-between text-[11px] text-zinc-400">

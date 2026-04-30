@@ -125,12 +125,12 @@ export function CommandPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 pt-[12vh] backdrop-blur-md"
+      className="fixed inset-0 z-[100] flex items-stretch justify-center bg-black/40 backdrop-blur-md sm:items-start sm:pt-[12vh]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) setOpen(false)
       }}
     >
-      <div className="w-full max-w-[640px] overflow-hidden rounded-lg border border-slate-800 bg-slate-900 shadow-2xl">
+      <div className="flex w-full flex-col overflow-hidden border-slate-800 bg-slate-900 shadow-2xl sm:h-auto sm:max-w-[640px] sm:rounded-lg sm:border">
         <Command
           label="Command palette"
           loop
@@ -154,7 +154,7 @@ export function CommandPalette() {
             className="w-full bg-transparent px-3 py-3 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-500"
             autoFocus
           />
-          <Command.List className="max-h-[420px] overflow-y-auto border-t border-slate-800 px-1 py-1">
+          <Command.List className="max-h-[420px] flex-1 overflow-y-auto border-t border-slate-800 px-1 py-1 sm:flex-none">
             <Command.Empty className="px-3 py-6 text-center text-xs text-zinc-500">
               No results.
             </Command.Empty>

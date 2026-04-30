@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import * as Y from 'yjs'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
@@ -17,9 +18,17 @@ function initials(s: string): string {
 interface Props {
   ticket: Y.Map<unknown>
   compact?: boolean
+  /** When true, shows the j/k navigation focus ring. */
+  selected?: boolean
 }
 
-export function TicketCard({ ticket, compact = false }: Props) {
+/**
+ * Memoized so the Kanban's root re-renders (which happen on any ticket-tree
+ * change) don't fan out to every card. This card subscribes to its own
+ * Y.Map via useYMap; when sibling tickets change, this component's snapshot
+ * is unchanged and React.memo bails out.
+ */
+function TicketCardImpl({ ticket, compact = false, selected = false }: Props) {
   const t = useYMap<Ticket>(ticket)
   const navigate = useNavigate()
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -42,7 +51,10 @@ export function TicketCard({ ticket, compact = false }: Props) {
         onClick={onClick}
         {...listeners}
         {...attributes}
-        className="flex cursor-grab items-center justify-between rounded border border-slate-800 bg-slate-900 px-2 py-1.5 text-xs active:cursor-grabbing"
+        className={cn(
+          'flex cursor-grab items-center justify-between rounded border border-slate-800 bg-slate-900 px-2 py-1.5 text-xs transition-colors duration-100 active:cursor-grabbing',
+          selected && 'ring-2 ring-blue-500',
+        )}
       >
         <span className="font-mono text-zinc-500">{t.humanId}</span>
         <span className="text-zinc-500 tabular-nums">${fmt.format(t.mrrAtRisk)}</span>
@@ -57,8 +69,10 @@ export function TicketCard({ ticket, compact = false }: Props) {
       onClick={onClick}
       {...listeners}
       {...attributes}
+      data-ticket-id={t.id}
       className={cn(
-        'group flex cursor-grab flex-col gap-2 rounded-md border border-slate-800 bg-slate-900 p-3 transition-colors hover:border-slate-700 active:cursor-grabbing',
+        'group flex cursor-grab flex-col gap-2 rounded-md border border-slate-800 bg-slate-900 p-3 transition-colors duration-100 hover:border-slate-700 active:cursor-grabbing',
+        selected && 'ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-950 border-blue-700',
       )}
     >
       <div className="flex items-center justify-between">
@@ -84,3 +98,5 @@ export function TicketCard({ ticket, compact = false }: Props) {
     </div>
   )
 }
+
+export const TicketCard = memo(TicketCardImpl)

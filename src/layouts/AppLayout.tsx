@@ -2,18 +2,22 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { LiveCursors } from '@/components/LiveCursors'
 import { CommandPalette } from '@/components/palette/CommandPalette'
 import { Toaster } from '@/components/ui/toaster'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { GlobalShortcuts } from '@/components/GlobalShortcuts'
+import { KeyboardCheatsheet } from '@/components/KeyboardCheatsheet'
 import { Sidebar } from './Sidebar'
 import { TopHeader } from './TopHeader'
 
 const COLLAPSED_KEY = 'beagle:sidebar-collapsed'
 
 /**
- * The shell every route renders inside. Mounts the singleton overlays
- * (LiveCursors, CommandPalette, Toaster) at the app root so they're available
- * regardless of which route is active.
+ * The shell every route renders inside. Mounts singleton overlays
+ * (LiveCursors, CommandPalette, GlobalShortcuts, KeyboardCheatsheet,
+ * Toaster) at the app root + wraps route content in an ErrorBoundary so
+ * the chrome keeps working even when a route subtree crashes.
  *
- * Sidebar collapse state is the only piece of UI chrome we cache to
- * localStorage — everything else (filters, selection) is in the URL.
+ * Sidebar collapse is the only piece of UI chrome we cache to localStorage —
+ * everything else (filters, selection) is in the URL.
  */
 export function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(() => {
@@ -29,7 +33,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0')
     } catch {
-      // Ignore — best effort.
+      // best-effort
     }
   }, [collapsed])
 
@@ -49,10 +53,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-slate-950 text-zinc-100">
       <LiveCursors />
       <CommandPalette />
+      <KeyboardCheatsheet />
+      <GlobalShortcuts />
       <Toaster />
 
       <div className="flex h-screen overflow-hidden">
-        {/* Mobile drawer backdrop */}
         {mobileOpen && (
           <div
             onClick={() => setMobileOpen(false)}
@@ -71,7 +76,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">
           <TopHeader onMenuClick={() => setMobileOpen(true)} />
           <main className="flex-1 overflow-auto">
-            <div className="px-6 py-6">{children}</div>
+            <div className="px-4 py-4 sm:px-6 sm:py-6">
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </div>
           </main>
         </div>
       </div>

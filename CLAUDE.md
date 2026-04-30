@@ -55,8 +55,11 @@ Each seed comment's `body` (markdown) is parsed at build-time into a Tiptap JSON
 
 The Yjs room name was bumped `v1` → `v2` so users with cached Phase-1 data get fresh state. Old IDB databases are unreferenced but not auto-deleted.
 
-### 🔜 Phase 7 — *not yet built*
-Open candidates: real watchers (Yjs `watchers` Y.Array per ticket), notification system (browser notifications on @-mentions or status_change-while-watching), threaded replies on comments, settings page, ticket creation UI, real entities populated from Yjs property metadata, ticket creation from the palette (Cmd-K → "New ticket").
+### ✅ Phase 7 — Polish to demo quality
+Sonner replaces the homegrown toaster (same `toast()` import surface, swipe-to-dismiss, Undo affordances on status changes). `<ErrorBoundary>` wraps every route inside AppLayout — chrome (sidebar, palette, header) keeps working when a route subtree throws. `<GlobalShortcuts>` provider owns `g i`/`g h` chord shortcuts (1.5s window), `c` (compose new ticket modal — full Radix Dialog with title + assignee), `j`/`k`/`Enter` board navigation via custom events, and `⌘/` to focus search. `<KeyboardCheatsheet>` on `?` is a Radix Dialog with grouped shortcut tables. Status pills got the dot-plus-label treatment with one shared color token per status (zinc/blue/amber/emerald). MRR badge keeps text as primary signal + 💰 emoji + tier-color bg. `TicketCard` is `memo`'d; selected card shows a `ring-2 ring-blue-500` for j/k navigation. Mobile Kanban (≤767px) becomes a tab switcher (Triage / Scripting / Review / Done) with 44px touch targets. Cmd-K palette is full-screen on mobile. CodeRunner shows a state dot in its header (slate idle / amber running / emerald ready / red error). Toast on every status drag with one-click Undo that re-applies in a single transaction. Inter font features (`tnum`, `ss01`, `cv11`) for tabular numerics. Global 120ms hover / 80ms press transitions. NotFound now reads the missing ticket id from the URL and offers "Compose new ticket →" as a CTA. dnd-kit `KeyboardSensor` added for keyboard drag-drop. axe-core wired in dev mode (lazy-imported so it never ships to prod). Composer has `role="textbox" aria-multiline="true" aria-label="Comment"`.
+
+### 🔜 Phase 8 — *not yet built*
+Open candidates: real watchers (Yjs `watchers` Y.Array per ticket), notification system (browser notifications on @-mentions or status_change-while-watching), threaded replies on comments, settings page, real entities populated from Yjs property metadata, sortableKeyboardCoordinates for proper cross-column keyboard DnD, full inline `/run` execution as a node view inside the composer.
 
 ## Hard architectural rules — DO NOT VIOLATE
 

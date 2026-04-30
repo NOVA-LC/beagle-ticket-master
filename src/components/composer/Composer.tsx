@@ -50,6 +50,9 @@ export function Composer({ ticket }: Props) {
           class:
             'prose prose-invert prose-sm max-w-none min-h-[100px] px-3 py-2 focus:outline-none ' +
             '[&_p]:my-2 [&_h1]:mt-3 [&_h2]:mt-3 [&_pre]:bg-slate-950 [&_pre]:border [&_pre]:border-slate-800 [&_code]:text-zinc-200',
+          role: 'textbox',
+          'aria-multiline': 'true',
+          'aria-label': 'Comment',
         },
         handleKeyDown(_view, event) {
           if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {

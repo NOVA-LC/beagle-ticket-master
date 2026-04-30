@@ -5,10 +5,17 @@ import { doc, tickets } from './lib/yjs/doc'
 import { seedIfEmpty } from './lib/seed'
 import './index.css'
 
-// Kick off seeding alongside React mount. The Y.Doc and providers were
-// instantiated at module-load time of `lib/yjs/doc`; seedIfEmpty races the
-// WebRTC peer-sync event against a 1s timeout and only seeds if no peer
-// supplied state.
+// Phase-7 a11y: in dev only, run axe-core against every render and log
+// violations to the browser console. Lazy-imported so it never ships to prod.
+if (import.meta.env.DEV) {
+  void Promise.all([import('@axe-core/react'), import('react-dom')]).then(
+    ([{ default: axe }, ReactDOMModule]) => {
+      axe(React, ReactDOMModule, 1000)
+    },
+  )
+}
+
+// Race-safe seeding (Phase 6).
 void seedIfEmpty(doc, tickets)
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

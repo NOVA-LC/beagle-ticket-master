@@ -33,6 +33,16 @@ Keyboard shortcuts inside a ticket:
 - `t` — Add property tag
 - `r` — Re-run last script
 
+## 90-second screen-recording demo
+
+**Setup:** Open https://beagle-ticket-master.vercel.app at 1440×900. Have a second window queued.
+
+**0:00–0:25 — Board.** Land on the Kanban: 5 tickets, sorted by MRR at risk. The MRR badges grade red→amber→slate per threshold. Press `?` — keyboard cheatsheet appears, briefly. Esc. Drag **BGL-102** (Pinecrest) from *Triage* to *Scripting*. Toast bottom-right: *"Moved BGL-102 to Scripting · Undo"*. Click Undo — card snaps back, audit trail records both moves.
+
+**0:25–0:55 — Ticket.** Press ⌘K, type "westlake", hit Enter — routes to BGL-101. Sidebar metadata: status pill with blue dot, $1,648 MRR badge in red, Westlake Communities tag, linked tickets chips. Timeline already has David's escalation comment, Lila's status change, the inter-ticket bi-link reply, and the historical pandas run. Click *Run a Python script* → expand, Run. Pyodide loads from CDN (~3-8s warm), output streams. Toast: *"Ran 1.2s · output below"*.
+
+**0:55–1:30 — Composer.** Scroll to the sticky composer. Type `[[wes` — Tippy popover offers Westlake Communities. Enter. Hover the blue chip — AIContext popover fades in (~120ms): *"…41% verified coverage rate, 17 uninsured units, **$138K/year in liability exposure**"*. Type a sentence, ⌘↵ to submit. Comment lands in the timeline with the bi-link still interactive. Hard refresh — IndexedDB rehydrates everything including the new comment. Open a second browser window — y-webrtc replicates state in ~50ms; awareness avatars stack in the top-right.
+
 ## Demo: multiplayer seeding
 
 1. Open a fresh browser → see all 5 tickets (BGL-101…105) populated by `seedIfEmpty`. The timeline on BGL-101 already has a comment from David, a status change to Scripting, an @-mention reply with bi-links to `[[westlake-communities]]`, `[[yardi-sync]]`, and `[[BGL-103]]`, and a captured pandas reconciliation `script_run` event.

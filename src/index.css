@@ -5,6 +5,17 @@
 @layer base {
   body {
     @apply bg-slate-950 text-zinc-100 font-sans antialiased;
+    /* tnum: tabular numerics so MRR figures align in lists.
+       ss01/cv11: Inter stylistic alternates (cleaner lowercase a, etc). */
+    font-feature-settings: "tnum", "ss01", "cv11";
+  }
+  /* Globally-tighter micro-interaction transitions. */
+  button, a, input, select, textarea, [role="button"] {
+    transition-duration: 120ms;
+    transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  button:active, a:active, [role="button"]:active {
+    transition-duration: 80ms;
   }
 }
 

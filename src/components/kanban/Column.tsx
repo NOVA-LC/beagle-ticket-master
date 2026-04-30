@@ -18,9 +18,10 @@ interface Props {
   status: TicketStatus
   tickets: Array<{ id: string; map: Y.Map<unknown>; mrr: number }>
   variant?: 'main' | 'rail'
+  selectedId?: string | null
 }
 
-export function Column({ status, tickets, variant = 'main' }: Props) {
+export function Column({ status, tickets, variant = 'main', selectedId }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const totalMrr = tickets.reduce((sum, t) => sum + t.mrr, 0)
 
@@ -45,7 +46,7 @@ export function Column({ status, tickets, variant = 'main' }: Props) {
               {EMPTY_COPY[status]}
             </p>
           ) : (
-            tickets.map((t) => <TicketCard key={t.id} ticket={t.map} compact />)
+            tickets.map((t) => <TicketCard key={t.id} ticket={t.map} compact selected={t.id === selectedId} />)
           )}
         </div>
       </div>
@@ -75,7 +76,7 @@ export function Column({ status, tickets, variant = 'main' }: Props) {
       ) : (
         <div className="flex flex-col gap-2">
           {tickets.map((t) => (
-            <TicketCard key={t.id} ticket={t.map} />
+            <TicketCard key={t.id} ticket={t.map} selected={t.id === selectedId} />
           ))}
         </div>
       )}
