@@ -1,5 +1,6 @@
 export type TicketStatus = 'triage' | 'scripting' | 'review' | 'done'
-export type TicketPriority = 'P0' | 'P1' | 'P2' | 'P3'
+/** 1 = urgent, 4 = lowest. Numeric so the seed schema can use integers verbatim. */
+export type TicketPriority = 1 | 2 | 3 | 4
 
 export const STATUS_ORDER: TicketStatus[] = ['triage', 'scripting', 'review', 'done']
 export const STATUS_LABELS: Record<TicketStatus, string> = {

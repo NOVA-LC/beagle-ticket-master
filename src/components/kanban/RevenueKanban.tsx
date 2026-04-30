@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import * as Y from 'yjs'
 import {
   DndContext,
@@ -11,10 +11,9 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 
-import { tickets, doc, appendTicketEvent, seedIfEmpty } from '@/lib/yjs/doc'
+import { tickets, doc, appendTicketEvent } from '@/lib/yjs/doc'
 import { useYMap } from '@/lib/yjs/useYMap'
 import type { TicketStatus } from '@/lib/yjs/types'
-import { SEED } from '@/lib/yjs/seed'
 import { getCurrentUser } from '@/lib/user'
 import { useUrlState, ticketMatchesFilters } from '@/lib/url-state'
 import { Column } from './Column'
@@ -35,9 +34,7 @@ export function RevenueKanban() {
   const { filters } = useUrlState()
   const [activeId, setActiveId] = useState<string | null>(null)
 
-  useEffect(() => {
-    void seedIfEmpty(SEED)
-  }, [])
+  // Seeding moved to main.tsx (Phase 6) — the kanban no longer triggers it.
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = []

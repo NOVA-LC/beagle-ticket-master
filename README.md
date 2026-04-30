@@ -33,6 +33,12 @@ Keyboard shortcuts inside a ticket:
 - `t` — Add property tag
 - `r` — Re-run last script
 
+## Demo: multiplayer seeding
+
+1. Open a fresh browser → see all 5 tickets (BGL-101…105) populated by `seedIfEmpty`. The timeline on BGL-101 already has a comment from David, a status change to Scripting, an @-mention reply with bi-links to `[[westlake-communities]]`, `[[yardi-sync]]`, and `[[BGL-103]]`, and a captured pandas reconciliation `script_run` event.
+2. Open a second browser window → tickets sync via y-webrtc. The race-safe seed detects peer state and skips re-seeding (no duplicate events).
+3. Open a third window in **incognito** (no IndexedDB cache) → still receives full state from peer 1 within ~50ms; again no re-seed because peer.synced fires before the 1s timeout.
+
 ## Demo: full ticket flow
 
 1. `npm run dev` — visit `/`. Three tickets, sorted by MRR.

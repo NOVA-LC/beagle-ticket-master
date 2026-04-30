@@ -8,6 +8,15 @@ export interface Entity {
   context: string
 }
 
+/**
+ * Ticket entities use the humanId as both `id` and `label` so a `[[BGL-103]]`
+ * bi-link in seeded comment bodies renders compactly (just "BGL-103") rather
+ * than expanding to the full ticket title. The descriptive summary lives in
+ * `context` and surfaces inside the AIContext popover.
+ *
+ * Property entities keep human-readable labels because users type
+ * `[[Westlake]]` expecting "Westlake Communities" to render.
+ */
 export const ENTITIES: readonly Entity[] = [
   {
     id: 'westlake-communities',
@@ -33,15 +42,32 @@ export const ENTITIES: readonly Entity[] = [
   {
     id: 'BGL-101',
     kind: 'ticket',
-    label: 'BGL-101: Westlake — 103 Uninsured Error',
-    context:
-      'Linked ticket. Status: In Progress. MRR at risk: $1,648. Assignee: Data Eng.',
+    label: 'BGL-101',
+    context: 'Westlake Communities — 103 Uninsured Error. Status: Scripting. MRR at risk: $1,648. Assignee: Data Eng.',
   },
   {
     id: 'BGL-102',
     kind: 'ticket',
-    label: 'BGL-102: Pinecrest — Monday Action List',
-    context: 'Linked ticket. Status: Triage. MRR at risk: $272.',
+    label: 'BGL-102',
+    context: 'REQ: Monday Morning Action List — Pinecrest. Status: Triage. MRR at risk: $272.',
+  },
+  {
+    id: 'BGL-103',
+    kind: 'ticket',
+    label: 'BGL-103',
+    context: 'Data Ingestion Failure — Yardi Sync. Status: Review. MRR at risk: $890. Assignee: Data Eng.',
+  },
+  {
+    id: 'BGL-104',
+    kind: 'ticket',
+    label: 'BGL-104',
+    context: 'Compliance dashboard shows wrong portfolio total. Status: Triage. MRR at risk: $540.',
+  },
+  {
+    id: 'BGL-105',
+    kind: 'ticket',
+    label: 'BGL-105',
+    context: 'FEATURE REQ: auto-trigger reconciliation when expiration < 14 days. Status: Triage.',
   },
 ] as const
 

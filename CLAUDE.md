@@ -41,8 +41,22 @@ Migrated from `<BrowserRouter>` JSX to `createBrowserRouter` (data-router patter
 
 Comments now persist BOTH `body` (markdown) and `bodyJson` (Tiptap JSON snapshot). Read-only timeline renders via Tiptap with the JSON; markdown is the export format. Legacy comments without bodyJson fall back to a `<pre>` of the markdown.
 
-### 🔜 Phase 6 — *not yet built*
-Open candidates: real watchers (Yjs `watchers` Y.Array per ticket), notification system (browser notifications on @-mentions or status_change-while-watching), threaded replies on comments, settings page (theme, persona, etc.), ticket creation UI, real `entities.ts` populated from Yjs property metadata.
+### ✅ Phase 6 — Hyper-specific 5-ticket seed + race-safe seeding
+Replaced the Phase-1 3-ticket seed with 5 tickets that have full event histories: BGL-101 (Westlake — 103 Uninsured Error, with the historical pandas reconciliation run captured as a `script_run` event), BGL-102 (Pinecrest action list request), BGL-103 (Yardi sync ingestion failure with auto-resolved key rotation), BGL-104 (compliance dashboard portfolio mismatch), BGL-105 (auto-trigger reconciliation feature request).
+
+`src/lib/seed.ts` now owns both the data AND the race-safe `seedIfEmpty(doc, tickets)` function. The race algorithm:
+1. Await `indexeddbProvider.whenSynced` (so we don't seed over local state).
+2. If `tickets.size > 0` → bail.
+3. Race `webrtcProvider.on('synced')` vs a 1000ms timeout.
+4. If 'synced' wins → a peer has data, bail.
+5. If timeout wins AND `tickets.size === 0` → seed atomically inside `doc.transact`, with a `_meta.seeded` flag set inside the transaction as defense-in-depth against simultaneous fresh clients.
+
+Each seed comment's `body` (markdown) is parsed at build-time into a Tiptap JSON `bodyJson` field — `[[entity-id]]` references resolve through the entity registry into `biLink` nodes. This means seeded comments render with interactive AIContext popovers in the read-only timeline (the demo's punchline).
+
+The Yjs room name was bumped `v1` → `v2` so users with cached Phase-1 data get fresh state. Old IDB databases are unreferenced but not auto-deleted.
+
+### 🔜 Phase 7 — *not yet built*
+Open candidates: real watchers (Yjs `watchers` Y.Array per ticket), notification system (browser notifications on @-mentions or status_change-while-watching), threaded replies on comments, settings page, ticket creation UI, real entities populated from Yjs property metadata, ticket creation from the palette (Cmd-K → "New ticket").
 
 ## Hard architectural rules — DO NOT VIOLATE
 
@@ -69,6 +83,12 @@ We picked **(B)**. The postinstall script (`scripts/copy-pyodide.mjs`) still run
 
 ### Worker imports `pyodide` directly + Vite externalization warnings
 At build time you'll see warnings like `Module "node:fs" has been externalized for browser compatibility, imported by ".../pyodide.mjs"`. These are harmless — Pyodide branches on environment at runtime and never executes the Node-only paths in a browser worker. The externalized stub is never invoked. **Do not** try to "fix" these with `optimizeDeps.exclude` or polyfills; the current setup works.
+
+### Seed bodies → Tiptap JSON at build time
+`src/lib/seed.ts` ships a tiny `[[entity]]` → biLink Tiptap-JSON parser. Every seed comment is converted into both a markdown `body` AND a `bodyJson` so the read-only timeline renders interactive bi-link chips on freshly-seeded tickets. If you add a new seed comment that references an entity not in `src/lib/entities.ts`, the bracketed reference renders as literal text (parser fallback) — add the entity rather than letting the demo go flat.
+
+### Race-safe seeding lives in seed.ts, not doc.ts
+`doc.ts` no longer owns seeding. `seed.ts` imports `doc, tickets, webrtcProvider, indexeddbProvider` and exposes `seedIfEmpty(doc, tickets)`. `main.tsx` calls it once at module load (before React mounts). Don't move it back inside a component effect — StrictMode would invoke it twice and you'd race against yourself.
 
 ### Status enum migration
 Phase 1 used capitalized statuses (`'Triage'`, `'In Progress'`, `'Blocked'`, `'Done'`). Phase 3 lowercased them (`'triage'`, `'scripting'`, `'review'`, `'done'`). `doc.ts` runs an idempotent migration on IDB hydrate (`migrateLegacyStatuses`). If you add new statuses, update the enum in `src/lib/yjs/types.ts` AND extend the migration map.
