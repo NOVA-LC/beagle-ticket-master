@@ -19,10 +19,30 @@ export interface RunResult {
 
 const RUN_TIMEOUT_MS = 30_000
 
-// Module-level singleton — one worker for the whole browser session.
+// ── Module singletons ────────────────────────────────────────────────────────
+// One worker per browser session. `preloadState` is shared across all hook
+// instances so the CodeRunner reflects ongoing init progress even when the
+// init was kicked off from main.tsx (Phase 8 pre-warm).
 let worker: Worker | null = null
 let api: Comlink.Remote<PythonAPI> | null = null
-let initialized = false
+let preloadPromise: Promise<void> | null = null
+
+interface PreloadState {
+  ready: boolean
+  errored: boolean
+  progress: number
+  message: string
+}
+
+const preloadState: PreloadState = {
+  ready: false,
+  errored: false,
+  progress: 0,
+  message: 'Booting Python (loading pandas — first run only, ~12s)',
+}
+
+const listeners = new Set<() => void>()
+const notify = () => listeners.forEach((l) => l())
 
 function spawn(): { worker: Worker; api: Comlink.Remote<PythonAPI> } {
   worker = new Worker(new URL('../../workers/python.worker.ts', import.meta.url), {
@@ -30,7 +50,6 @@ function spawn(): { worker: Worker; api: Comlink.Remote<PythonAPI> } {
     name: 'pyodide',
   })
   api = Comlink.wrap<PythonAPI>(worker)
-  initialized = false
   return { worker, api }
 }
 
@@ -43,7 +62,12 @@ function killWorker() {
   worker?.terminate()
   worker = null
   api = null
-  initialized = false
+  preloadPromise = null
+  preloadState.ready = false
+  preloadState.errored = false
+  preloadState.progress = 0
+  preloadState.message = 'Restarting Python…'
+  notify()
 }
 
 function progressFromMessage(msg: string, prev: number): number {
@@ -54,131 +78,145 @@ function progressFromMessage(msg: string, prev: number): number {
   return prev
 }
 
+/**
+ * Phase-8: pre-warm Pyodide on app boot so by the time the user clicks Run,
+ * pandas is already loaded. Idempotent — calling multiple times returns the
+ * same promise.
+ */
+export function preloadPyodide(): Promise<void> {
+  if (preloadPromise) return preloadPromise
+  const { api } = getWorker()
+  preloadPromise = api
+    .ready(
+      Comlink.proxy((msg: string) => {
+        preloadState.message = msg
+        preloadState.progress = progressFromMessage(msg, preloadState.progress)
+        notify()
+      }),
+    )
+    .then(() => {
+      preloadState.ready = true
+      preloadState.errored = false
+      preloadState.progress = 1
+      notify()
+    })
+    .catch((err) => {
+      preloadState.errored = true
+      preloadState.message = `Failed to load Python: ${err instanceof Error ? err.message : String(err)}`
+      preloadPromise = null // allow retry
+      notify()
+    })
+  return preloadPromise
+}
+
 export function usePyodide() {
-  const [status, setStatus] = useState<Status>('loading')
-  const [loadProgress, setLoadProgress] = useState(0)
-  const [loadMessage, setLoadMessage] = useState('Booting Python (loading pandas — first run only, ~12s)')
+  const [, force] = useState(0)
+  const [running, setRunning] = useState(false)
   const [output, setOutput] = useState<OutputChunk[]>([])
   const [lastRun, setLastRun] = useState<RunResult | null>(null)
-
   const runIdRef = useRef(0)
 
   useEffect(() => {
-    let cancelled = false
-    const { api } = getWorker()
-
-    const onMessage = Comlink.proxy((msg: string) => {
-      if (cancelled) return
-      setLoadMessage(msg)
-      setLoadProgress((prev) => progressFromMessage(msg, prev))
-    })
-
-    if (!initialized) {
-      initialized = true
-      api
-        .ready(onMessage)
-        .then(() => {
-          if (cancelled) return
-          setStatus('ready')
-          setLoadProgress(1)
-        })
-        .catch((err) => {
-          if (cancelled) return
-          setStatus('error')
-          setLoadMessage(`Failed to load Python: ${err instanceof Error ? err.message : String(err)}`)
-        })
-    } else {
-      setStatus('ready')
-      setLoadProgress(1)
-    }
-
+    const sync = () => force((n) => n + 1)
+    listeners.add(sync)
+    if (!preloadPromise) void preloadPyodide()
     return () => {
-      cancelled = true
+      listeners.delete(sync)
     }
   }, [])
 
+  const status: Status = running
+    ? 'running'
+    : preloadState.errored
+      ? 'error'
+      : preloadState.ready
+        ? 'ready'
+        : 'loading'
+
   const clear = useCallback(() => setOutput([]), [])
 
-  const run = useCallback(async (code: string): Promise<RunResult | null> => {
-    if (status !== 'ready') return null
+  const run = useCallback(
+    async (code: string): Promise<RunResult | null> => {
+      if (status !== 'ready') return null
 
-    const myRunId = ++runIdRef.current
-    setStatus('running')
-    setOutput([])
+      const myRunId = ++runIdRef.current
+      setRunning(true)
+      setOutput([])
 
-    const stdoutBuf: string[] = []
-    const stderrBuf: string[] = []
+      const stdoutBuf: string[] = []
+      const stderrBuf: string[] = []
 
-    const append = (stream: Stream, text: string) => {
-      if (runIdRef.current !== myRunId) return
-      ;(stream === 'stdout' ? stdoutBuf : stderrBuf).push(text)
-      setOutput((chunks) => [...chunks, { stream, text }])
-    }
-
-    const cb = Comlink.proxy({
-      onStdout: (s: string) => append('stdout', s),
-      onStderr: (s: string) => append('stderr', s),
-    })
-
-    let timedOut = false
-    const { worker: w, api: a } = getWorker()
-
-    const timer = window.setTimeout(() => {
-      timedOut = true
-      w.terminate()
-      killWorker()
-      append('stderr', '\nScript timed out — terminated.\n')
-      const result: RunResult = {
-        stdout: stdoutBuf.join(''),
-        stderr: stderrBuf.join('') + '\nScript timed out — terminated.\n',
-        durationMs: RUN_TIMEOUT_MS,
-        timedOut: true,
+      const append = (stream: Stream, text: string) => {
+        if (runIdRef.current !== myRunId) return
+        ;(stream === 'stdout' ? stdoutBuf : stderrBuf).push(text)
+        setOutput((chunks) => [...chunks, { stream, text }])
       }
-      setLastRun(result)
-      setStatus('error')
-      // Re-spin in the background.
-      const respawn = getWorker()
-      const onMessage = Comlink.proxy((msg: string) => {
-        setLoadMessage(msg)
-        setLoadProgress((prev) => progressFromMessage(msg, prev))
+
+      const cb = Comlink.proxy({
+        onStdout: (s: string) => append('stdout', s),
+        onStderr: (s: string) => append('stderr', s),
       })
-      initialized = true
-      respawn.api.ready(onMessage).then(() => {
-        setStatus('ready')
-        setLoadProgress(1)
-      })
-    }, RUN_TIMEOUT_MS)
 
-    try {
-      const { durationMs } = await a.run(code, cb)
-      window.clearTimeout(timer)
-      if (timedOut) return null
+      let timedOut = false
+      const { worker: w, api: a } = getWorker()
 
-      const result: RunResult = {
-        stdout: stdoutBuf.join(''),
-        stderr: stderrBuf.join(''),
-        durationMs,
-        timedOut: false,
+      const timer = window.setTimeout(() => {
+        timedOut = true
+        w.terminate()
+        killWorker()
+        append('stderr', '\nScript timed out — terminated.\n')
+        const result: RunResult = {
+          stdout: stdoutBuf.join(''),
+          stderr: stderrBuf.join('') + '\nScript timed out — terminated.\n',
+          durationMs: RUN_TIMEOUT_MS,
+          timedOut: true,
+        }
+        setLastRun(result)
+        setRunning(false)
+        // Re-spin in the background so the next run isn't a cold start UX-wise.
+        void preloadPyodide()
+      }, RUN_TIMEOUT_MS)
+
+      try {
+        const { durationMs } = await a.run(code, cb)
+        window.clearTimeout(timer)
+        if (timedOut) return null
+
+        const result: RunResult = {
+          stdout: stdoutBuf.join(''),
+          stderr: stderrBuf.join(''),
+          durationMs,
+          timedOut: false,
+        }
+        setLastRun(result)
+        setRunning(false)
+        return result
+      } catch (err) {
+        window.clearTimeout(timer)
+        if (timedOut) return null
+        const msg = err instanceof Error ? err.message : String(err)
+        append('stderr', `${msg}\n`)
+        const result: RunResult = {
+          stdout: stdoutBuf.join(''),
+          stderr: stderrBuf.join('') + msg + '\n',
+          durationMs: 0,
+          timedOut: false,
+        }
+        setLastRun(result)
+        setRunning(false)
+        return result
       }
-      setLastRun(result)
-      setStatus('ready')
-      return result
-    } catch (err) {
-      window.clearTimeout(timer)
-      if (timedOut) return null
-      const msg = err instanceof Error ? err.message : String(err)
-      append('stderr', `${msg}\n`)
-      const result: RunResult = {
-        stdout: stdoutBuf.join(''),
-        stderr: stderrBuf.join('') + msg + '\n',
-        durationMs: 0,
-        timedOut: false,
-      }
-      setLastRun(result)
-      setStatus('error')
-      return result
-    }
-  }, [status])
+    },
+    [status],
+  )
 
-  return { status, loadProgress, loadMessage, run, clear, output, lastRun }
+  return {
+    status,
+    loadProgress: preloadState.progress,
+    loadMessage: preloadState.message,
+    run,
+    clear,
+    output,
+    lastRun,
+  }
 }

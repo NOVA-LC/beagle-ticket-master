@@ -41,8 +41,9 @@ export function LiveCursors() {
         return (
           <div
             key={clientId}
-            className="absolute"
-            style={{ left: cursor.x, top: cursor.y, transform: 'translate(-2px, -2px)' }}
+            aria-hidden
+            className="absolute left-0 top-0 transition-transform duration-200 ease-out"
+            style={{ transform: `translate(${cursor.x - 2}px, ${cursor.y - 2}px)` }}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
               <path

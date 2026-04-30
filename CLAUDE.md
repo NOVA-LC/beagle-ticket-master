@@ -58,8 +58,26 @@ The Yjs room name was bumped `v1` → `v2` so users with cached Phase-1 data get
 ### ✅ Phase 7 — Polish to demo quality
 Sonner replaces the homegrown toaster (same `toast()` import surface, swipe-to-dismiss, Undo affordances on status changes). `<ErrorBoundary>` wraps every route inside AppLayout — chrome (sidebar, palette, header) keeps working when a route subtree throws. `<GlobalShortcuts>` provider owns `g i`/`g h` chord shortcuts (1.5s window), `c` (compose new ticket modal — full Radix Dialog with title + assignee), `j`/`k`/`Enter` board navigation via custom events, and `⌘/` to focus search. `<KeyboardCheatsheet>` on `?` is a Radix Dialog with grouped shortcut tables. Status pills got the dot-plus-label treatment with one shared color token per status (zinc/blue/amber/emerald). MRR badge keeps text as primary signal + 💰 emoji + tier-color bg. `TicketCard` is `memo`'d; selected card shows a `ring-2 ring-blue-500` for j/k navigation. Mobile Kanban (≤767px) becomes a tab switcher (Triage / Scripting / Review / Done) with 44px touch targets. Cmd-K palette is full-screen on mobile. CodeRunner shows a state dot in its header (slate idle / amber running / emerald ready / red error). Toast on every status drag with one-click Undo that re-applies in a single transaction. Inter font features (`tnum`, `ss01`, `cv11`) for tabular numerics. Global 120ms hover / 80ms press transitions. NotFound now reads the missing ticket id from the URL and offers "Compose new ticket →" as a CTA. dnd-kit `KeyboardSensor` added for keyboard drag-drop. axe-core wired in dev mode (lazy-imported so it never ships to prod). Composer has `role="textbox" aria-multiline="true" aria-label="Comment"`.
 
-### 🔜 Phase 8 — *not yet built*
-Open candidates: real watchers (Yjs `watchers` Y.Array per ticket), notification system (browser notifications on @-mentions or status_change-while-watching), threaded replies on comments, settings page, real entities populated from Yjs property metadata, sortableKeyboardCoordinates for proper cross-column keyboard DnD, full inline `/run` execution as a node view inside the composer.
+### ✅ Phase 8 — Demo-day hardening
+**Pyodide preload** lifted to module scope. `usePyodide.ts` now exposes `preloadPyodide()` that returns a shared `Promise<void>`. `main.tsx` calls it after Yjs init; the hook subscribes to shared module state via a `Set<() => void>` of listeners. By the time the user clicks Run, pandas is loaded.
+
+**WebRTC signaling fallback** — `WebrtcProvider` is constructed with three signaling URLs (`signaling.yjs.dev` + two heroku backups). Any single dead server doesn't break multiplayer. If all fail, the app degrades to single-user — Yjs has no required network dependency.
+
+**`<ConnectionStatus />`** strip in TopHeader: emerald + "Live · N peers" / amber + "Reconnecting…" / slate + "Offline · changes saved locally". Listens to `webrtcProvider.on('status' | 'peers')` plus `window.online`/`offline`.
+
+**`?reset=hard`** wipes IndexedDB and re-seeds. To make this work without a race, `main.tsx` is now an `async function bootstrap()` that does the IDB wipe BEFORE dynamic-importing `lib/yjs/doc.ts` (which opens IndexeddbPersistence at module load). The reset query param is stripped from the URL via `history.replaceState` before any module touches the DB. Documented in `docs/PRE_DEMO_CHECKLIST.md`.
+
+**`?simulate=david` fake peer** — `FakePeer.tsx` lazy-mounts when the URL has `?simulate=david`. Animates a "David Park · CS" cursor (lissajous) and posts a comment to BGL-101 every 30s (cycling through canned messages). A floating Pause/Resume button lets the presenter quiet it during slow segments. Comments land in real Yjs and replicate to peers — the only fake part is the cursor.
+
+**Cursor interpolation** — `LiveCursors.tsx` switched from `style={{ left, top }}` (instant jump) to `transform: translate(...)` with `transition-transform duration-200 ease-out`. Combined with the existing 50ms throttle, cursors look smooth even on bad wifi.
+
+**Friendlier Pyodide errors** — `python.worker.ts` has a `formatPythonError()` that prepends a one-line hint for common cases (`ModuleNotFoundError`, `SyntaxError`, `IndentationError`, `NameError`, `TypeError`, `KeyError`) before the full traceback. The traceback is preserved verbatim for actual debugging.
+
+**`/demo` autoplay route** (DEV-only — gated on `import.meta.env.DEV` in `App.tsx`). Loops a 7-step scripted walkthrough every ~25 seconds: drags BGL-102, opens BGL-101, posts a synthetic script_run, posts a comment with a `[[Westlake Communities]]` bi-link, moves the ticket to Review. A floating overlay shows the current step + Pause button. Useful for solo rehearsal.
+
+**Docs:** `docs/DEMO.md` (the 30-second hook + 3 killshots + what's NOT built + text-based architecture diagram) and `docs/PRE_DEMO_CHECKLIST.md` (15-item checklist run before every live demo). `vercel.json` updated to the spec-mandated minimal SPA rewrite.
+
+**Bundle re-shape** as a side effect of the async bootstrap: the entry chunk dropped from 533 KB → 47 KB gzipped; first paint downloads `index + doc + seed + usePyodide + App` in parallel (~140 KB gzipped). TicketDetail still lazy at 169 KB. Trade-off: 2-stage waterfall on initial load (entry → parallel chunk fetch). Acceptable for a demo-quality SPA; revisit with `manualChunks` if it ever shows in field metrics.
 
 ## Hard architectural rules — DO NOT VIOLATE
 

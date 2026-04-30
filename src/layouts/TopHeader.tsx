@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useYAwareness } from '@/lib/yjs/useYAwareness'
 import { awareness } from '@/lib/yjs/doc'
+import { ConnectionStatus } from '@/components/ConnectionStatus'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -84,6 +85,7 @@ export function TopHeader({ onMenuClick }: Props) {
       </button>
 
       <div className="flex items-center gap-2">
+        <ConnectionStatus />
         <div className="flex -space-x-2">
           {visible.map((p) => (
             <div

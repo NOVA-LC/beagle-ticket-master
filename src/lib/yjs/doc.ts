@@ -26,8 +26,18 @@ export const tickets: Y.Map<unknown> = doc.getMap('tickets')
 /** IndexedDB persistence — survives refresh on the same origin/browser. */
 export const indexeddbProvider = new IndexeddbPersistence(ROOM, doc)
 
-/** WebRTC peer sync + presence (awareness) — public signaling defaults are fine for dev. */
-export const webrtcProvider = new WebrtcProvider(ROOM, doc)
+/**
+ * WebRTC peer sync + presence. Multiple signaling fallbacks so a single dead
+ * server doesn't break multiplayer. If ALL fail, the app gracefully degrades
+ * to single-user mode — Yjs has no required network dependency.
+ */
+export const webrtcProvider = new WebrtcProvider(ROOM, doc, {
+  signaling: [
+    'wss://signaling.yjs.dev',
+    'wss://y-webrtc-signaling-eu.herokuapp.com',
+    'wss://y-webrtc-signaling-us.herokuapp.com',
+  ],
+})
 
 /** Awareness instance (presence/cursors) — provided by y-webrtc, backed by y-protocols. */
 export const awareness = webrtcProvider.awareness

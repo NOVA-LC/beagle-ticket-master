@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { LiveCursors } from '@/components/LiveCursors'
 import { CommandPalette } from '@/components/palette/CommandPalette'
 import { Toaster } from '@/components/ui/toaster'
@@ -7,6 +7,9 @@ import { GlobalShortcuts } from '@/components/GlobalShortcuts'
 import { KeyboardCheatsheet } from '@/components/KeyboardCheatsheet'
 import { Sidebar } from './Sidebar'
 import { TopHeader } from './TopHeader'
+
+// Lazy so the FakePeer chunk only loads when ?simulate=david is set.
+const FakePeer = lazy(() => import('@/components/FakePeer').then((m) => ({ default: m.FakePeer })))
 
 const COLLAPSED_KEY = 'beagle:sidebar-collapsed'
 
@@ -28,6 +31,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
     }
   })
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const simulating = useMemo(
+    () => new URLSearchParams(window.location.search).get('simulate') === 'david',
+    [],
+  )
 
   useEffect(() => {
     try {
@@ -56,6 +64,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <KeyboardCheatsheet />
       <GlobalShortcuts />
       <Toaster />
+      {simulating && (
+        <Suspense fallback={null}>
+          <FakePeer />
+        </Suspense>
+      )}
 
       <div className="flex h-screen overflow-hidden">
         {mobileOpen && (

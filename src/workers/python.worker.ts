@@ -31,6 +31,36 @@ interface RunCallbacks {
   onStderr: (chunk: string) => void
 }
 
+/**
+ * Phase-8: replace raw Python tracebacks with a friendly preamble so the demo
+ * audience sees something readable, then the full traceback follows for
+ * actual debugging. Common cases get specific hints.
+ */
+function formatPythonError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+
+  let preamble: string | null = null
+
+  const moduleMatch = msg.match(/No module named ['"]([^'"]+)['"]/)
+  if (moduleMatch) {
+    preamble = `❗ Module '${moduleMatch[1]}' isn't loaded — try \`pyodide.loadPackage('${moduleMatch[1]}')\` first.`
+  } else if (msg.includes('SyntaxError')) {
+    preamble = `❗ Python syntax error — the code didn't parse.`
+  } else if (msg.includes('IndentationError')) {
+    preamble = `❗ Indentation issue — Python is whitespace-sensitive.`
+  } else if (msg.includes('NameError')) {
+    const nameMatch = msg.match(/name ['"]([^'"]+)['"] is not defined/)
+    if (nameMatch) preamble = `❗ '${nameMatch[1]}' isn't defined yet — typo, or maybe defined in a different cell?`
+  } else if (msg.includes('TypeError')) {
+    preamble = `❗ Type mismatch — Python got a value it didn't know how to use.`
+  } else if (msg.includes('KeyError')) {
+    preamble = `❗ Key not found in dict/DataFrame.`
+  }
+
+  const body = msg.endsWith('\n') ? msg : `${msg}\n`
+  return preamble ? `${preamble}\n\n${body}` : body
+}
+
 const api = {
   /** Idempotent — first call starts init; subsequent calls await the same promise. */
   async ready(onMessage: (msg: string) => void): Promise<void> {
@@ -61,8 +91,7 @@ const api = {
     try {
       await pyodide.runPythonAsync(code)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      cb.onStderr(msg.endsWith('\n') ? msg : `${msg}\n`)
+      cb.onStderr(formatPythonError(err))
     }
     return { durationMs: performance.now() - t0 }
   },
