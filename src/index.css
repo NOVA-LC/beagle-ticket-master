@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-zinc-100 font-sans antialiased;
+  }
+}
+
+@layer components {
+  .token.comment, .token.prolog, .token.doctype, .token.cdata { color: #64748b; font-style: italic; }
+  .token.punctuation { color: #94a3b8; }
+  .token.property, .token.tag, .token.boolean, .token.number,
+  .token.constant, .token.symbol { color: #38bdf8; }
+  .token.selector, .token.attr-name, .token.string, .token.char,
+  .token.builtin { color: #a3e635; }
+  .token.operator, .token.entity, .token.url,
+  .language-css .token.string, .style .token.string { color: #cbd5e1; }
+  .token.keyword, .token.atrule, .token.attr-value { color: #f472b6; }
+  .token.function, .token.class-name { color: #fbbf24; }
+  .token.regex, .token.important, .token.variable { color: #fb923c; }
+}

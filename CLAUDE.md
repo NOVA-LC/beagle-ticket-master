@@ -1,0 +1,132 @@
+# CLAUDE.md — Project context for AI agents
+
+This file is the entry point for any LLM continuing the Beagle Ticket Master build. Read it before touching code; many architectural choices here are non-obvious and are the result of explicit constraints in earlier phases.
+
+## Product context
+
+Beagle is a PropTech company selling a renter's-insurance-waiver program to multifamily property managers. This tool is **internal only** — it's how CS reps escalate data/script requests to the Data Eng team. The core problem it solves: CS Slacks Eng a Westlake reconciliation request, Eng asks for context, three days of ping-pong. This app fuses a ticket queue with an embeddable Python runtime, sorted by **MRR at risk**.
+
+Internal users:
+- **CS reps** — file tickets, attach property names, escalate to Eng
+- **Data Eng team** — pick up tickets, run reconciliation scripts inline, mark resolved
+
+## Stack
+
+- **Vite 6** + **React 18** + **TypeScript** (strict)
+- **Tailwind 3** + handful of vendored shadcn-style primitives (no full shadcn install — see `src/components/ui/`)
+- **Yjs** + **y-webrtc** (peer sync + presence/awareness) + **y-indexeddb** (persistence)
+- **Pyodide 0.27.7** in a Web Worker via **Comlink**
+- **dnd-kit** (Kanban DnD)
+- **cmdk** (command palette)
+- **react-router-dom** v6 (Browser router, useSearchParams for filter state)
+
+No backend. The whole app is a static SPA — Vercel just serves `dist/`.
+
+## Build phases — what's done, what's next
+
+### ✅ Phase 1 — Yjs base + multiplayer board
+Y.Doc singleton at `src/lib/yjs/doc.ts`. Tickets are `Y.Map`s (not JSON blobs). Each ticket owns an append-only `events` `Y.Array`. WebRTC + IndexedDB providers bind to the same doc. Custom `useYMap` / `useYArray` / `useYAwareness` hooks use `useSyncExternalStore` for tearing-free updates. Live cursors via awareness, throttled to 50ms.
+
+### ✅ Phase 2 — Executable ticket (CodeRunner)
+Pyodide runs in `src/workers/python.worker.ts` (Comlink-exposed). Streamed stdout/stderr via `pyodide.setStdout({ batched })` → main thread. 30s runaway-script timeout via `worker.terminate()` + respawn. Successful runs append a `script_run` event to the ticket's audit log.
+
+### ✅ Phase 3 — Dollar-weighted Kanban + Cmd-K palette
+`RevenueKanban` at `/`: three main columns (Triage / Scripting / Review) + collapsed Done rail. dnd-kit handles drag-between-columns; drop = `ticket.set('status', newStatus)` + audit event. Cmd-K palette at app root: Jump (fuzzy ticket search), Action on current ticket (sub-pages via Tab for status / assign / tag), Filter board (URL-based), Navigate. Position memory per `route + page`.
+
+### 🔜 Phase 4 — *not yet built*
+Likely candidates suggested by the spec evolution: Comments / threaded discussion, Slack-like notifications, ticket creation UI, real attachment upload, settings page (currently a stub at `/settings`).
+
+## Hard architectural rules — DO NOT VIOLATE
+
+1. **The Y.Doc lives in a singleton.** Never construct a second `Y.Doc()` for tickets. Add new collections to the existing doc via `doc.getMap('newCollection')`.
+2. **Each ticket is a `Y.Map`, not a JSON blob.** Serializing the whole ticket as a string defeats CRDT merging. New fields go on the map directly.
+3. **Events are append-only.** Deletions are tombstones (`type: 'comment_deleted'` event with `targetId`). Never remove from the `events` `Y.Array`.
+4. **No CDN script tags.** Pyodide is imported from npm via `import { loadPyodide } from 'pyodide'`. (Pyodide's *asset URL* points to jsdelivr — see "Pyodide note" below; the spec banned `<script>` tags, not data URLs.)
+5. **Pyodide stays in a worker.** Pandas import takes ~12s cold; on the main thread that freezes the UI. Use the existing `usePyodide` hook.
+6. **URL is the source of truth for board filters.** Filter state lives in `useSearchParams`, not `useState`. The Kanban derives `rows` from `useYMap(tickets)` + `useUrlState()`; there is no third place that holds filter state.
+7. **dnd-kit `activationConstraint: { distance: 6 }`** is what makes click-to-navigate and drag-to-move coexist on the same card. Don't drop the constraint.
+8. **No triple-coding for severity.** Pick at most two of {color, icon, weight, copy}. Current `MrrBadge` uses bg-color + 💰 emoji = two signals. Don't add bold or alarm copy.
+
+## Non-obvious decisions worth knowing
+
+### Pyodide indexURL → jsdelivr CDN
+The npm `pyodide` package only contains the **runtime** (`pyodide.mjs`, `pyodide.asm.wasm`, `python_stdlib.zip`, `pyodide-lock.json`). It does NOT contain the package wheels (pandas ~13MB, numpy ~3MB). Earlier phases planned to copy `node_modules/pyodide/*` to `public/pyodide/` via a postinstall script — that runs and the runtime files do get copied — but `loadPackage('pandas')` would 404 without the wheels.
+
+Three options were considered:
+- (A) Download the full `pyodide-{version}.tar.bz2` from GitHub releases at build time (~200MB)
+- (B) Set `indexURL` to `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`
+- (C) Write a custom `lockFileURL` that points wheels to CDN and runtime to local
+
+We picked **(B)**. The postinstall script (`scripts/copy-pyodide.mjs`) still runs to keep the runtime locally available in case we want to swap to (A) or (C) later, but at runtime the worker fetches everything from jsdelivr. If you switch to a self-hosted setup, change `PYODIDE_INDEX_URL` in `src/workers/python.worker.ts` and download the full distribution into `public/pyodide/`.
+
+### Worker imports `pyodide` directly + Vite externalization warnings
+At build time you'll see warnings like `Module "node:fs" has been externalized for browser compatibility, imported by ".../pyodide.mjs"`. These are harmless — Pyodide branches on environment at runtime and never executes the Node-only paths in a browser worker. The externalized stub is never invoked. **Do not** try to "fix" these with `optimizeDeps.exclude` or polyfills; the current setup works.
+
+### Status enum migration
+Phase 1 used capitalized statuses (`'Triage'`, `'In Progress'`, `'Blocked'`, `'Done'`). Phase 3 lowercased them (`'triage'`, `'scripting'`, `'review'`, `'done'`). `doc.ts` runs an idempotent migration on IDB hydrate (`migrateLegacyStatuses`). If you add new statuses, update the enum in `src/lib/yjs/types.ts` AND extend the migration map.
+
+### Event shape: flat fields, discriminated union
+Events are a discriminated union on `type` with **flat fields** at the top level (no `payload` wrapper). E.g. `script_run` has `code`, `stdout`, `stderr`, `durationMs`, `runBy` directly on the event. `appendTicketEvent` accepts `DistributiveOmit<TicketEvent, 'id'>` so adding a new event variant requires zero changes to the helper signature — just extend the union in `types.ts`.
+
+### Y.Map type variance
+Yjs types are invariant in their value parameter. `Y.Map<Y.Map<unknown>>` is **not** assignable to `Y.Map<unknown>`. `tickets` is therefore typed as `Y.Map<unknown>` and consumers cast `tickets.get(id)` to `Y.Map<unknown> | undefined`. This is the simplest workaround — don't try to fix it with generics on the hooks (`useYMap<T>(map: Y.Map<unknown>)` is the contract).
+
+### Avatar + cn — vendored
+`src/components/ui/avatar.tsx` is a 20-line component, not the Radix-backed shadcn version. `src/lib/utils.ts` is just clsx, not clsx + tailwind-merge. Neither is wired through shadcn's CLI. Add new shadcn components by either running `npx shadcn add <component>` (which will create `components.json` for you) or by vendoring them by hand here.
+
+### `?simulate=david` URL flag
+`getCurrentUser()` reads `?simulate=` to pretend to be a known persona. Used for screencast demos where you want a labeled "CS Rep David" cursor in one tab and your real engineer cursor in another. Keep this — it's how the live-cursors story is demoed.
+
+## Local dev
+
+```bash
+npm install        # postinstall copies Pyodide runtime to public/pyodide/
+npm run dev        # http://localhost:5173
+```
+
+Two browser windows on `localhost:5173` are peers via WebRTC defaults — moves and edits replicate in ~50ms.
+
+## Deploy
+
+Deployed to Vercel. `vercel.json` has SPA rewrites that exclude `/assets`, `/pyodide`, and `/favicon.ico` from the catch-all so static asset paths still resolve. The first cold build is slow because npm install pulls Pyodide (~50MB). Subsequent builds reuse npm cache.
+
+## File tree (truncated)
+
+```
+src/
+  lib/
+    utils.ts                 # cn() — clsx wrapper
+    user.ts                  # getCurrentUser() with ?simulate= persona resolver
+    url-state.ts             # useUrlState() — board filters live in search params
+    yjs/
+      doc.ts                 # Y.Doc singleton, providers, seedIfEmpty, appendTicketEvent, legacy migration
+      types.ts               # TicketStatus enum, TicketEvent discriminated union
+      seed.ts                # 3 seeded tickets (BGL-101/102/103)
+      useYMap.ts             # tearing-free Y.Map snapshot via useSyncExternalStore
+      useYArray.ts           # same for Y.Array
+      useYAwareness.ts       # awareness states for cursors
+    python/
+      usePyodide.ts          # singleton worker, status state, run() with timeout-respawn
+  workers/
+    python.worker.ts         # Comlink-exposed Pyodide API
+  components/
+    ui/
+      avatar.tsx             # vendored
+      toaster.tsx            # 30-line toast emitter (not sonner)
+    StatusPill.tsx
+    LiveCursors.tsx          # awareness-driven labeled cursors
+    CodeRunner.tsx           # editor + run + streamed output
+    RunHistory.tsx           # accordion of past script_run events
+    TicketDetail.tsx         # / wrapped routes here
+    kanban/
+      MrrBadge.tsx           # bg-color tier + 💰 emoji (two signals max)
+      TicketCard.tsx         # draggable, navigate-on-click
+      Column.tsx             # droppable, 'main' | 'rail' variant
+      RevenueKanban.tsx      # the / route, FilterChips
+    palette/
+      usePaletteActions.ts   # action list given route + page
+      CommandPalette.tsx     # Cmd-K modal, sub-pages via Tab/Backspace
+  App.tsx                    # <Routes>, mounts LiveCursors + CommandPalette + Toaster
+  main.tsx                   # BrowserRouter
+  index.css                  # @tailwind + Prism token colors
+```
