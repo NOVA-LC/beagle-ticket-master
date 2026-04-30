@@ -36,8 +36,13 @@ Pyodide runs in `src/workers/python.worker.ts` (Comlink-exposed). Streamed stdou
 ### ✅ Phase 4 — Tiptap composer with bi-link entities
 `<Composer />` is mounted on the ticket detail (between CodeRunner and RunHistory). Tiptap React + StarterKit (no dropcursor/gapcursor). Custom `BiLink` extension uses `@tiptap/suggestion` with `char: '['` + an `allow()` callback that requires the prior char to also be `[` — that's the canonical workaround for Tiptap's single-char trigger limit when you need `[[`. Bi-links render via a React node view that wraps a Radix Popover; hover-OR-click anchored, with manual delays so crossing the trigger→content gap doesn't flicker. `AIContext` reads from `src/lib/entities.ts` (no API yet). Drafts persist to `localStorage` keyed by `draft:ticket:<id>`, debounced 500ms; restore-banner on mount with relative timestamp + dismiss. `SlashMenu` extension scaffolds `/run` (inserts a Python code block) and `/template` (stub). Comments serialize to markdown via a custom Tiptap-JSON walker (`composer/markdown.ts`) and append as `comment` events to the ticket's audit log.
 
-### 🔜 Phase 5 — *not yet built*
-Open candidates: comment list view (currently write-only), inline `/run` code execution (custom node view that hosts a runner per code block), real `entities.ts` populated from Yjs property metadata, ticket creation UI, settings, threaded replies on comments.
+### ✅ Phase 5 — Master AppLayout + data router
+Migrated from `<BrowserRouter>` JSX to `createBrowserRouter` (data-router pattern). Mounted `<AppLayout>` shell with collapsible sidebar (⌘\\ toggles, localStorage-cached), top header with brand mark + click-to-open palette + awareness avatars + user menu, and `<main>` scroll container. Sidebar nav active-state matches by **pathname AND filter params** so Inbox/High-Liability/Reconciliations don't all light up at once. New `<TicketDetail>` page at `/pages/TicketDetail.tsx` is a 70/30 split-pane: main pane has inline-editable title (controlled `<input>`, not Tiptap — see "Editable title trade-off" below), AIContextStrip (collapsible if any property tag matches a registered entity), full `<EventTimeline>` rendering all event types (comments via read-only Tiptap so bi-link AIContext popovers stay interactive), `<CodeRunnerCollapsible>` (auto-expanded if last event was a script_run), and a sticky-bottom Composer. Sidebar pane is `<MetadataSidebar>` with Status/Assignee selects, editable MRR field, tag chips, linked tickets, watchers stub, timestamps. `<NotFound>` is the route error fallback.
+
+Comments now persist BOTH `body` (markdown) and `bodyJson` (Tiptap JSON snapshot). Read-only timeline renders via Tiptap with the JSON; markdown is the export format. Legacy comments without bodyJson fall back to a `<pre>` of the markdown.
+
+### 🔜 Phase 6 — *not yet built*
+Open candidates: real watchers (Yjs `watchers` Y.Array per ticket), notification system (browser notifications on @-mentions or status_change-while-watching), threaded replies on comments, settings page (theme, persona, etc.), ticket creation UI, real `entities.ts` populated from Yjs property metadata.
 
 ## Hard architectural rules — DO NOT VIOLATE
 
@@ -79,6 +84,15 @@ Yjs types are invariant in their value parameter. `Y.Map<Y.Map<unknown>>` is **n
 
 ### Tiptap node view for bi-links uses Radix Popover (not HoverCard)
 The spec asked for Radix Popover specifically. Hover behavior is wired manually with `onPointerEnter`/`onPointerLeave` on both Trigger and Content + a small delayed-close timer. `data-state` attribute on `.aicontext` drives the keyframe fade-in/out (120ms in, 80ms out, defined in `index.css`). If the gap between trigger and content gets bigger than 6px, increase `sideOffset` rather than the close delay.
+
+### Editable title trade-off
+Phase 5 spec asked for "Tiptap single-line" inline-editable title. We ship a controlled `<input>` instead. Why: a Tiptap instance per ticket header (one per `/ticket/:id` mount) would add ~200ms of init time and an editor instance to GC; a single-line title doesn't need rich text. Behavior is identical from the user side (click to edit, Enter commits, Escape reverts, blur commits). If you later need marks in titles, swap `EditableTitle.tsx` for a Tiptap with a custom Document that has `content: 'text*'` and a `handleKeyDown` that traps Enter.
+
+### Sidebar nav active-state matches both path AND filter params
+`useIsActive()` in `Sidebar.tsx` is the canonical way: parse the link target as a URL, compare both pathname and the filter params declared on each NavItem. NavLink's default would highlight every nav item that points to `/`, which is wrong when filters disambiguate them.
+
+### Sticky composer is sticky inside `AppLayout`'s scroll container
+`<main>` in `AppLayout.tsx` is `overflow-auto` — that's the scroll context. The Composer in `pages/TicketDetail.tsx` uses `sticky bottom-0 -mx-6` to span the gutter and stick relative to that container. Don't add `overflow: auto` on intermediate divs — that would break sticky positioning.
 
 ### Avatar + cn — vendored
 `src/components/ui/avatar.tsx` is a 20-line component, not the Radix-backed shadcn version. `src/lib/utils.ts` is just clsx, not clsx + tailwind-merge. Neither is wired through shadcn's CLI. Add new shadcn components by either running `npx shadcn add <component>` (which will create `components.json` for you) or by vendoring them by hand here.

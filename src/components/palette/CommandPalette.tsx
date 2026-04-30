@@ -59,7 +59,12 @@ export function CommandPalette() {
       }
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const onOpenEvent = () => setOpen(true)
+    window.addEventListener('beagle:open-palette', onOpenEvent)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('beagle:open-palette', onOpenEvent)
+    }
   }, [open, onTicketRoute])
 
   const ctxKey = `${location.pathname}:${page}`

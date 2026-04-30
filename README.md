@@ -33,6 +33,15 @@ Keyboard shortcuts inside a ticket:
 - `t` — Add property tag
 - `r` — Re-run last script
 
+## Demo: full ticket flow
+
+1. `npm run dev` — visit `/`. Three tickets, sorted by MRR.
+2. Drag **BGL-102** from *Triage* → *Scripting*. Card moves; status_change event lands in the audit log.
+3. ⌘K → "Open BGL-101" → `/ticket/bgl-101`. Right-side **Properties** sidebar shows status, assignee, MRR, tags, linked tickets.
+4. Click **Run a Python script** → expand the runner. Click *Run* — Pyodide loads from CDN, pandas reconciliation streams. Run persists in the timeline.
+5. In the sticky Composer at the bottom, type a comment with `[[Westlake Communities]]`. Hover the link — AIContext popover fades in with the $138K exposure line. ⌘↵ submits.
+6. Refresh — everything (drag, run, comment, status change) persisted via IndexedDB.
+
 ## Demo: bi-link composer + AI context
 
 1. Open `/ticket/bgl-101`. The Composer sits below the Run pane.

@@ -97,6 +97,7 @@ export function Composer({ ticket }: Props) {
       by: user.name,
       at: Date.now(),
       body,
+      bodyJson: json,
     })
     editor.commands.clearContent()
     clear()
