@@ -1,12 +1,31 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, useNavigate, useParams } from 'react-router-dom'
 import * as Y from 'yjs'
 import { LiveCursors } from '@/components/LiveCursors'
 import { CommandPalette } from '@/components/palette/CommandPalette'
 import { Toaster } from '@/components/ui/toaster'
 import { RevenueKanban } from '@/components/kanban/RevenueKanban'
-import { TicketDetail } from '@/components/TicketDetail'
 import { tickets } from '@/lib/yjs/doc'
 import { useYMap } from '@/lib/yjs/useYMap'
+
+/**
+ * TicketDetail pulls in Tiptap, Radix Popover, prismjs, react-simple-code-editor,
+ * and the Pyodide hook — collectively ~700kB of the bundle. Lazy-loading the
+ * route keeps `/` (the Kanban) in the initial chunk and defers the rest until
+ * the user actually opens a ticket.
+ */
+const TicketDetail = lazy(() =>
+  import('@/components/TicketDetail').then((m) => ({ default: m.TicketDetail })),
+)
+
+function RouteFallback() {
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-12">
+      <div className="h-3 w-40 animate-pulse rounded bg-slate-800" />
+      <div className="mt-3 h-2 w-24 animate-pulse rounded bg-slate-900" />
+    </div>
+  )
+}
 
 function TicketDetailRoute() {
   const { id } = useParams<{ id: string }>()
@@ -28,7 +47,11 @@ function TicketDetailRoute() {
       </div>
     )
   }
-  return <TicketDetail ticket={ticket} onBack={() => navigate('/')} />
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <TicketDetail ticket={ticket} onBack={() => navigate('/')} />
+    </Suspense>
+  )
 }
 
 function Settings() {
